@@ -310,6 +310,7 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 
 	private static class Scope {
 		Set<String> localNames = HashSetFactory.make();
+		Set<String> nonLocalNames = HashSetFactory.make();
 		Set<String> globalNames = HashSetFactory.make();
 	}
 	
@@ -865,6 +866,13 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			return ast.makeNode(CAstNode.EMPTY);
 		}
 		
+		public CAstNode visitNonLocal(PyObject nonlocal, WalkContext context) {
+			Scope s = context.scope();
+			@SuppressWarnings("unchecked")
+			List<String> names = (List<String>) nonlocal.getAttr("names");
+			s.nonLocalNames.addAll(names);
+			return ast.makeNode(CAstNode.EMPTY);
+		}
 		
 		public CAstNode visitClassDef(PyObject arg0, WalkContext context) throws Exception {
 			return ast.makeNode(CAstNode.EMPTY);
