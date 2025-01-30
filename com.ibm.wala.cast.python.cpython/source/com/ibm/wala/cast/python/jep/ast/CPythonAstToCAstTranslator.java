@@ -249,7 +249,7 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 
 	public static class ScriptContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
 			implements WalkContext {
-		private final Scope scope = new Scope();
+		private final Scope scope; 
 		
 		private final PyObject ast;
 		PythonScriptEntity self;
@@ -258,6 +258,12 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			super(null, s);
 			this.ast = s;
 			this.self = self;
+			scope = new Scope() {
+				@Override
+				Scope parent() {
+					return null;
+				} 				
+			};
 		}
 		
 		public Scope scope() {
@@ -308,15 +314,16 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		}
 	}
 
-	private static class Scope {
-		Set<String> localNames = HashSetFactory.make();
+	private static abstract class Scope {
+		abstract Scope parent();
+		
 		Set<String> nonLocalNames = HashSetFactory.make();
 		Set<String> globalNames = HashSetFactory.make();
 	}
 	
 	private static class FunctionContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
 		implements WalkContext {
-		private final Scope scope = new Scope();
+		private final Scope scope; 
 		
 		public Scope scope() {
 			return scope;
@@ -324,7 +331,14 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 
 		protected FunctionContext(WalkContext parent, PyObject s) {
 			super(parent, s);
-			// TODO Auto-generated constructor stub
+			scope = new Scope() {
+
+				@Override
+				Scope parent() {
+					return parent.scope();
+				}
+				
+			};
 		}
 	}
 
