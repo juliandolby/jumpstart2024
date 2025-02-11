@@ -319,6 +319,8 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		
 		Set<String> nonLocalNames = HashSetFactory.make();
 		Set<String> globalNames = HashSetFactory.make();
+		Set<String> allNames = HashSetFactory.make();
+		Set<String> writtenNames = HashSetFactory.make();
 	}
 	
 	private static class FunctionContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
@@ -553,6 +555,8 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 
 		public CAstNode visitName(PyObject o, WalkContext context) {
 			String nm = (String) o.getAttr("id");
+
+			context.scope().allNames.add(nm);
 			 
 			return ast.makeNode(CAstNode.VAR, ast.makeConstant(nm));
 		}
@@ -567,6 +571,13 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			CAstNode rhs = visit(value, context);
 			@SuppressWarnings("unchecked")
 			List<PyObject> body = (List<PyObject>) o.getAttr("targets");
+			body.forEach(e -> {
+				CAstNode node = visit(e, context);
+				if (node.getKind() == CAstNode.VAR) {
+					String varName = (String) node.getChild(0).getValue();
+					context.scope().writtenNames.add(varName);
+				}
+			});
 			return ast.makeNode(CAstNode.BLOCK_STMT, body.stream()
 					.map(f -> ast.makeNode(CAstNode.ASSIGN, visit(f, context), rhs))
 					.collect(Collectors.toList()));
@@ -880,7 +891,7 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			return ast.makeNode(CAstNode.EMPTY);
 		}
 		
-		public CAstNode visitNonLocal(PyObject nonlocal, WalkContext context) {
+		public CAstNode visitNonlocal(PyObject nonlocal, WalkContext context) {
 			Scope s = context.scope();
 			@SuppressWarnings("unchecked")
 			List<String> names = (List<String>) nonlocal.getAttr("names");
