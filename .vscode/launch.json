@@ -24,7 +24,7 @@
         "-Djava.library.path=/root/miniconda3/envs/wala/lib/python3.13/site-packages/jep/"
       ],
       "args": [
-        "/root/code/jumpstart/jumpstart2024/com.ibm.wala.cast.python.cpython/data/test_global.py",
+        "/root/code/jumpstart/jumpstart2024/com.ibm.wala.cast.python.cpython/data/test_global_reference.py",
       ]
     },
     {
