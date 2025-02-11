@@ -898,7 +898,146 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			s.nonLocalNames.addAll(names);
 			return ast.makeNode(CAstNode.EMPTY);
 		}
-		
+
+		public CAstNode visitJoinedStr(PyObject arg0, WalkContext context) throws Exception {
+//			@SuppressWarnings("unchecked")
+//			Iterator<PyObject> values = ((List<PyObject>) arg0.getAttr("values")).iterator();
+//
+//			List<CAstNode> cs = new ArrayList<>();
+//			while (values.hasNext()) {
+//				CAstNode value = visitExpr(values.next(), context);
+//				cs.add(value);
+//			}
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		private int tmpIndex = 0;
+		public CAstNode visitDictComp(PyObject arg0, WalkContext context) throws Exception {
+			String dictName = "temp " + tmpIndex++;
+			CAstNode body =
+					ast.makeNode(
+							CAstNode.ASSIGN,
+							ast.makeNode(
+									CAstNode.OBJECT_REF,
+									ast.makeNode(CAstNode.VAR, ast.makeConstant(dictName)),
+									visit(arg0.getAttr("key", PyObject.class), context)),
+							visit(arg0.getAttr("value", PyObject.class), context));
+
+			return ast.makeNode(
+					CAstNode.BLOCK_EXPR,
+					ast.makeNode(
+							CAstNode.DECL_STMT,
+							ast.makeConstant(new CAstSymbolImpl(dictName, PythonCAstToIRTranslator.Any)),
+							ast.makeNode(CAstNode.NEW, ast.makeConstant(PythonTypes.dict))),
+					doGenerators((List<PyObject>) arg0.getAttr("generators"), body, context),
+					ast.makeNode(CAstNode.VAR, ast.makeConstant(dictName)));
+		}
+
+		private CAstNode doGenerators(List<PyObject> generators, CAstNode body, WalkContext context)
+				throws Exception {
+			CAstNode result = body;
+
+			for (PyObject c : generators) {
+				try {
+					List<PyObject> ifs = (List<PyObject>) c.getAttr("ifs");
+					int j = ifs.size();
+					if (j > 0) {
+						for (PyObject test : ifs) {
+							result = ast.makeNode(CAstNode.IF_EXPR, visit(test, context), body);
+						}
+					}
+				} catch (NullPointerException e) {
+					System.out.printf("generator null %s\n", e.getMessage());
+					continue;
+				}
+
+				String tempName = "temp " + ++tmpIndex;
+
+				CAstNode test =
+						ast.makeNode(
+								CAstNode.BINARY_EXPR,
+								CAstOperator.OP_NE,
+								ast.makeConstant(null),
+								ast.makeNode(
+										CAstNode.BLOCK_EXPR,
+										ast.makeNode(
+												CAstNode.ASSIGN,
+												visit(c.getAttr("target", PyObject.class), context),
+												ast.makeNode(
+														CAstNode.EACH_ELEMENT_GET,
+														ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+														visit(c.getAttr("target", PyObject.class), context)))));
+
+				result = ast.makeNode(
+						CAstNode.BLOCK_EXPR,
+						ast.makeNode(
+								CAstNode.DECL_STMT,
+								ast.makeConstant(new CAstSymbolImpl(tempName, PythonCAstToIRTranslator.Any)),
+								visit(c.getAttr("iter", PyObject.class), context)),
+						ast.makeNode(
+								CAstNode.ASSIGN,
+								visit(c.getAttr("target", PyObject.class), context),
+								ast.makeNode(
+										CAstNode.EACH_ELEMENT_GET,
+										ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+										ast.makeConstant(null))),
+						ast.makeNode(
+								CAstNode.LOOP,
+								test,
+								ast.makeNode(
+										CAstNode.BLOCK_EXPR,
+										ast.makeNode(
+												CAstNode.ASSIGN,
+												visit(c.getAttr("target", PyObject.class), context),
+												ast.makeNode(
+														CAstNode.OBJECT_REF,
+														ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+														visit(c.getAttr("target", PyObject.class), context))),
+										result)));
+			}
+
+			return result;
+		}
+
+		public CAstNode visitAnnAssign(PyObject arg0, WalkContext context) throws Exception {
+			// TODO: Handle simple attr
+			try {
+				return ast.makeNode(CAstNode.ASSIGN,
+						visit(arg0.getAttr("target", PyObject.class), context),
+						visit(arg0.getAttr("annotation", PyObject.class), context),
+						visit(arg0.getAttr("value", PyObject.class), context));
+			} catch (NullPointerException e) {
+				return ast.makeNode(CAstNode.ASSIGN,
+						visit(arg0.getAttr("target", PyObject.class), context),
+						visit(arg0.getAttr("annotation", PyObject.class), context));
+			}
+		}
+
+		public CAstNode visitAugAssign(PyObject arg0, WalkContext context) throws Exception {
+			return ast.makeNode(CAstNode.ASSIGN_PRE_OP,
+					visit(arg0.getAttr("target", PyObject.class), context),
+					visit(arg0.getAttr("value", PyObject.class), context),
+					translateOperator(arg0.getAttr("op", PyObject.class).getAttr("__class__", PyObject.class).getAttr("__name__", String.class)));
+		}
+
+		public CAstNode visitAssert(PyObject arg0, WalkContext context) throws Exception {
+			// TODO: Note position
+			try {
+				PyObject msg = arg0.getAttr("msg", PyObject.class);
+				return ast.makeNode(CAstNode.ASSERT, visit(arg0.getAttr("test", PyObject.class), context), visit(msg, context));
+			} catch (NullPointerException e) {
+				return ast.makeNode(CAstNode.ASSERT, visit(arg0.getAttr("test", PyObject.class), context));
+			}
+		}
+
+		public CAstNode visitAsyncFunctionDef(PyObject arg0, WalkContext context) throws Exception {
+			return visitFunctionDef(arg0, context);
+		}
+
+		public CAstNode visitAwait(PyObject arg0, WalkContext context) throws Exception {
+			return visitExpr(arg0, context);
+		}
+
 		public CAstNode visitClassDef(PyObject arg0, WalkContext context) throws Exception {
 			return ast.makeNode(CAstNode.EMPTY);
 			/*
