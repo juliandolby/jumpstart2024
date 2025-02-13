@@ -1204,6 +1204,77 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		      return x;
 		    */
 		    }
+
+		public CAstNode visitMatch(PyObject match, WalkContext context) {
+			CAstNode subject = visit((PyObject) match.getAttr("subject"), context);
+
+			@SuppressWarnings("unchecked")
+			List<PyObject> cases = (List<PyObject>) match.getAttr("cases");
+
+			return handleMatchCases(subject, cases, context);
+		}
+
+		public CAstNode handleMatchCases(CAstNode subject, List<PyObject> matchCases, WalkContext context) {
+			PyObject matchCase = matchCases.removeFirst();
+
+			CAstNode pattern = visit((PyObject) matchCase.getAttr("pattern"), context);
+			//CAstNode guard = visit((PyObject) matchCase.getAttr("guard"), context);
+			CAstNode body = visit(CAstNode.BLOCK_STMT,
+					((List<PyObject>) matchCase.getAttr("body")), context);
+
+			CAstNode eqTest = ast.makeNode(CAstNode.BINARY_EXPR,
+					CAstOperator.OP_EQ,
+					subject,
+					pattern);
+
+//			CAstNode ifTest = ast.makeNode(CAstNode.BINARY_EXPR,
+//					CAstOperator.OP_BIT_AND,
+//					eqTest,
+//					guard);
+
+			if (matchCases.isEmpty()) {
+				return ast.makeNode(CAstNode.IF_STMT,
+						eqTest,
+						body);
+			} else {
+				return ast.makeNode(CAstNode.IF_STMT,
+						eqTest,
+						body,
+						handleMatchCases(subject, matchCases, context));
+			}
+		}
+
+		public CAstNode visitMatchValue(PyObject matchValue, WalkContext context) {
+			return visit((PyObject) matchValue.getAttr("value"), context);
+		}
+
+		public CAstNode visitMatchSingleton(PyObject matchSingleton, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchSequence(PyObject matchSequence, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchMapping(PyObject matchMapping, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchClass(PyObject matchClass, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchStar(PyObject matchStar, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchAs(PyObject matchAs, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
+
+		public CAstNode visitMatchOr(PyObject matchOr, WalkContext context) {
+			return ast.makeNode(CAstNode.EMPTY);
+		}
 			
 		private Set<String> exposedNames(CAstNode tree) {
 			return nm.new Matcher()
