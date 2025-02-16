@@ -48,6 +48,7 @@ import com.ibm.wala.cast.tree.rewrite.CAstRewriter.RewriteContext;
 import com.ibm.wala.cast.tree.rewrite.CAstRewriterFactory;
 import com.ibm.wala.cast.tree.visit.CAstVisitor.Context;
 import com.ibm.wala.cast.util.CAstPattern;
+import com.ibm.wala.cfg.ControlFlowGraph;
 import com.ibm.wala.classLoader.IMethod;
 import com.ibm.wala.classLoader.SourceFileModule;
 import com.ibm.wala.classLoader.SourceModule;
@@ -56,9 +57,7 @@ import com.ibm.wala.ipa.callgraph.impl.Everywhere;
 import com.ibm.wala.ipa.cha.ClassHierarchyException;
 import com.ibm.wala.ipa.cha.IClassHierarchy;
 import com.ibm.wala.ipa.cha.SeqClassHierarchyFactory;
-import com.ibm.wala.ssa.IR;
-import com.ibm.wala.ssa.IRFactory;
-import com.ibm.wala.ssa.SSAOptions;
+import com.ibm.wala.ssa.*;
 import com.ibm.wala.types.ClassLoaderReference;
 import com.ibm.wala.util.collections.EmptyIterator;
 import com.ibm.wala.util.collections.HashSetFactory;
@@ -1571,8 +1570,59 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			c.getDeclaredMethods().forEach(m -> {
 				System.out.println("\t\t\tMethod: " + m);
 				IR ir = irs.makeIR(m, Everywhere.EVERYWHERE, SSAOptions.defaultOptions());
-				
-				System.out.println("\t\t\t\tIR dump: (default context, SSA options)");
+				SymbolTable symTab = ir.getSymbolTable();
+				System.out.println("\t\t\t\tSymbol Table for Method:");
+				int maxValueNumber = ir.getSymbolTable().getMaxValueNumber();
+				System.out.println("\t\t\t\tNumber of values in symbol table: " + maxValueNumber);
+				System.out.println("\t\t\t\tSymbol Table Entry for each Method Instruction:");
+				int instrIndex = 0;
+				for (SSAInstruction inst : ir.getInstructions()) {
+					if (inst != null) {
+						System.out.print("\t\t\t\t\t" + inst.iIndex() + ": " + inst.toString(symTab));
+						if (instrIndex != inst.iIndex()) {
+							System.out.print(" - index counting error!");
+						}
+						System.out.println();
+					} else {
+						System.out.println("\t\t\t\t\t" + instrIndex + ": null");
+					}
+					instrIndex++;
+				}
+				ControlFlowGraph<SSAInstruction, ISSABasicBlock> cfg = ir.getControlFlowGraph();
+				System.out.println("\n\t\t\t\tControl Flow Graph:");
+				System.out.println("\t\t\t\t\tBlocks:");
+				cfg.forEach(b -> {
+					System.out.println("\t\t\t\t\t\t" + b.toString());
+				});
+
+				System.out.println("\n\t\t\t\t\tBlock for each Method Instruction:");
+				instrIndex = 0;
+				for (SSAInstruction inst : ir.getInstructions()) {
+					if (inst != null) {
+						System.out.print("\t\t\t\t\t\t" + inst.iIndex() + ": " + cfg.getBlockForInstruction(inst.iIndex()));
+						if (instrIndex != inst.iIndex()) {
+							System.out.print(" - index counting error!");
+						}
+						System.out.println();
+					} else {
+						System.out.println("\t\t\t\t\t\t" + instrIndex + ": null");
+					}
+					instrIndex++;
+				}
+				System.out.println("\n\t\t\t\tVariables by instruction:");
+				for (SSAInstruction inst : ir.getInstructions()) {
+					if (inst != null) {
+						System.out.println("\t\t\t\t\tVariables known at instruction " + inst.iIndex() + " by value number:");
+						for (int i = 0; i <= maxValueNumber; i++) {
+							String[] locals = ir.getLocalNames(inst.iIndex(), i);
+							for (String local : locals) {
+								System.out.println("\t\t\t\t\t\t" + i + ": " + local);
+							}
+						}
+					}
+				}
+
+				System.out.println("\n\t\t\t\tMethod Full IR dump: (EVERYTHING context, default SSA options)");
 				BufferedReader bufReader = new BufferedReader(new StringReader(ir.toString()));
 				String line = null;
 				try {
@@ -1583,7 +1633,9 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 					System.err.println("Error reading file: " + e.getMessage());
 					e.printStackTrace();
 				}
+				System.out.println();
 			});
+			System.out.println();
 		});
 		
 	}
