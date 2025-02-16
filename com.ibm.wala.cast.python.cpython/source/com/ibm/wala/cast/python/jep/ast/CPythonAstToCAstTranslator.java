@@ -5,6 +5,8 @@ import static com.ibm.wala.cast.python.jep.Util.runit;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
@@ -54,6 +56,7 @@ import com.ibm.wala.ipa.callgraph.impl.Everywhere;
 import com.ibm.wala.ipa.cha.ClassHierarchyException;
 import com.ibm.wala.ipa.cha.IClassHierarchy;
 import com.ibm.wala.ipa.cha.SeqClassHierarchyFactory;
+import com.ibm.wala.ssa.IR;
 import com.ibm.wala.ssa.IRFactory;
 import com.ibm.wala.ssa.SSAOptions;
 import com.ibm.wala.types.ClassLoaderReference;
@@ -1322,12 +1325,25 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		Set<SourceModule> sources = Arrays.stream(args).map(file -> new SourceFileModule(new File(file), file, null)).collect(Collectors.toSet());
 		
 		IClassHierarchy cha = load(sources);
-		
+
+		System.out.println("Class hierarchy from: " + sources);
 		cha.forEach(c -> {
-			System.err.println(c);
+			System.out.println("\tClass: " + c + "\n\t\tClass Methods:");
 			c.getDeclaredMethods().forEach(m -> {
-				System.err.println(m);
-				System.err.println(irs.makeIR(m, Everywhere.EVERYWHERE, SSAOptions.defaultOptions()));
+				System.out.println("\t\t\tMethod: " + m);
+				IR ir = irs.makeIR(m, Everywhere.EVERYWHERE, SSAOptions.defaultOptions());
+				
+				System.out.println("\t\t\t\tIR dump: (default context, SSA options)");
+				BufferedReader bufReader = new BufferedReader(new StringReader(ir.toString()));
+				String line = null;
+				try {
+					while ((line = bufReader.readLine()) != null) {
+						System.out.println("\t\t\t\t\t" + line);
+					}
+				} catch (IOException e) {
+					System.err.println("Error reading file: " + e.getMessage());
+					e.printStackTrace();
+				}
 			});
 		});
 		
