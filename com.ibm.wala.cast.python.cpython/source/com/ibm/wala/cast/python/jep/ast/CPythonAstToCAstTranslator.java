@@ -870,6 +870,10 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			CAstNode target = visit(fl.getAttr("target", PyObject.class), context);
 		}
 		*/
+
+		public CAstNode visitSet(PyObject set, WalkContext context) {
+			return handleList("set", "elts", set, context);
+		}
 		
 		public CAstNode visitSubscript(PyObject subscript, WalkContext context) {
 			CAstNode obj =  visit(subscript.getAttr("value", PyObject.class), context);
