@@ -939,6 +939,10 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 					ast.makeNode(CAstNode.VAR, ast.makeConstant(dictName)));
 		}
 
+		public CAstNode visitYield(PyObject yield, WalkContext context) {
+			return ast.makeNode(CAstNode.RETURN_WITHOUT_BRANCH);
+		}
+
 		private CAstNode doGenerators(List<PyObject> generators, CAstNode body, WalkContext context)
 				throws Exception {
 			CAstNode result = body;
