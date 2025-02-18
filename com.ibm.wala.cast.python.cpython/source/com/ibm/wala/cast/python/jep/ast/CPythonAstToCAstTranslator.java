@@ -381,6 +381,7 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		CAst ast = new CAstImpl();
 		private int label = 0;
 		private final CAstEntity entity;
+		private int tmpIndex = 0;
 		
 		private TestVisitor(CAstEntity self) {
 			entity = self;
@@ -759,6 +760,13 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 					visit(CAstNode.BLOCK_STMT, orelse, context));
 		}
 
+    public CAstNode visitIfExp(PyObject ifstmt, WalkContext context) {
+			return ast.makeNode(CAstNode.IF_STMT, 
+					visit(ifstmt.getAttr("test", PyObject.class), context),
+					visit(ifstmt.getAttr("body", PyObject.class), context),
+					visit(ifstmt.getAttr("orelse", PyObject.class), context));
+    }
+
 		public CAstNode visitBreak(PyObject brkstmt, WalkContext context) {
 			CAstNode gt = ast.makeNode(CAstNode.GOTO);
 			context.cfg().map(brkstmt, gt);
@@ -852,11 +860,158 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			return handleList("tuple", "elts", tp, context);
 		}
 
-		/*
 		public CAstNode visitFor(PyObject fl, WalkContext context) {
-			CAstNode target = visit(fl.getAttr("target", PyObject.class), context);
+      return handleFor(fl,context);
 		}
-		*/
+
+		public CAstNode visitAsyncFor(PyObject fl, WalkContext context) {
+      return handleFor(fl,context);
+		}
+
+		private CAstNode handleTargetAndIter(CAstNode target, CAstNode iter, CAstNode body){
+			CAstNode result = body; 
+			String tempName = "temp " + ++tmpIndex;
+			CAstNode test =
+			ast.makeNode(
+				CAstNode.BINARY_EXPR,
+				CAstOperator.OP_NE,
+				ast.makeConstant(null),
+				ast.makeNode(
+					CAstNode.BLOCK_EXPR,
+					ast.makeNode(
+						CAstNode.ASSIGN,
+						target,
+						ast.makeNode(
+							CAstNode.EACH_ELEMENT_GET,
+							ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+							iter)
+						)
+					));
+			result = 
+				ast.makeNode(
+					CAstNode.BLOCK_STMT,
+					ast.makeNode(
+						CAstNode.DECL_STMT,
+						ast.makeConstant(
+							new CAstSymbolImpl(tempName, PythonCAstToIRTranslator.Any)),
+						iter),
+					ast.makeNode(
+						CAstNode.ASSIGN,
+						target,
+						ast.makeNode(
+							CAstNode.EACH_ELEMENT_GET,
+							ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+							ast.makeConstant(null))),
+					ast.makeNode(
+						CAstNode.LOOP,
+						test,
+						ast.makeNode(
+							CAstNode.BLOCK_STMT,
+							ast.makeNode(
+								CAstNode.ASSIGN,
+								target,
+								ast.makeNode(
+										CAstNode.OBJECT_REF,
+										ast.makeNode(CAstNode.VAR, ast.makeConstant(tempName)),
+										target)),
+							result)));
+			return result;
+		}
+
+		private CAstNode handleFor(PyObject fl, WalkContext context){
+			@SuppressWarnings("unchecked")
+			List<PyObject> orelse = (List<PyObject>) fl.getAttr("orelse");
+			@SuppressWarnings("unchecked")
+			List<PyObject> body = (List<PyObject>) fl.getAttr("body");
+			CAstNode target = visit(fl.getAttr("target", PyObject.class), context);
+			CAstNode iter = visit(fl.getAttr("iter", PyObject.class), context);
+
+			PyObject contLabel = runit("ast.Pass()");
+			PyObject breakLabel = runit("ast.Pass()");
+			LoopContext lc = new LoopContext(context, breakLabel, contLabel);
+			
+			CAstNode bodyNode = visit(CAstNode.BLOCK_STMT, body, lc);
+			
+			if (lc.continued) {
+				CAstNode cn = ast.makeNode(CAstNode.LABEL_STMT, ast.makeConstant("label_" + label++),visit(contLabel, context));
+				context.cfg().map(contLabel, cn);
+				bodyNode = ast.makeNode(CAstNode.BLOCK_STMT, bodyNode, cn);
+			}
+
+			// Making loop and test node for target an iter
+			CAstNode loopNode = handleTargetAndIter(target, iter, bodyNode);
+
+			if (!orelse.isEmpty()) {
+				CAstNode elseNode = visit(CAstNode.BLOCK_STMT, orelse, context);
+				loopNode = ast.makeNode(CAstNode.BLOCK_STMT, loopNode, elseNode);
+			}
+			
+			if (lc.broke) {
+				CAstNode bn = ast.makeNode(CAstNode.LABEL_STMT, ast.makeConstant("label_" + label++), visit(breakLabel, context));
+				context.cfg().map(breakLabel, bn);
+				loopNode = ast.makeNode(CAstNode.BLOCK_STMT, loopNode, bn);
+			}
+			return loopNode;
+    }
+
+		public CAstNode visitWith(PyObject o, WalkContext context) {
+      return handleWith(o,context);
+		}
+
+		public CAstNode visitAsyncWith(PyObject o, WalkContext context) {
+      return handleWith(o,context);
+		}
+
+		private CAstNode handleWith(PyObject o, WalkContext context){
+			@SuppressWarnings("unchecked")
+			List<PyObject> items = (List<PyObject>) o.getAttr("items");
+			@SuppressWarnings("unchecked")
+			List<PyObject> body = (List<PyObject>) o.getAttr("body");
+
+			CAstNode bodyAst = ast.makeNode(CAstNode.BLOCK_STMT, body.stream().map(f -> visit(f, context)).collect(Collectors.toList()));
+
+      for (PyObject wi : items) {
+				String tmpName = "tmp_" + ++tmpIndex;
+
+				CAstNode context_expr = visit(wi.getAttr("context_expr", PyObject.class), context);
+				CAstNode optional_vars = wi.getAttr("optional_vars", PyObject.class) != null
+					? visit(wi.getAttr("optional_vars", PyObject.class), context):
+					ast.makeNode(CAstNode.VAR, ast.makeConstant(tmpName));
+
+        bodyAst =
+            ast.makeNode(
+                CAstNode.BLOCK_STMT,
+                ast.makeNode(
+                    CAstNode.DECL_STMT,
+                    ast.makeConstant(new CAstSymbolImpl(tmpName, PythonCAstToIRTranslator.Any))),
+								optional_vars.getKind() == CAstNode.VAR
+										? ast.makeNode(
+												CAstNode.DECL_STMT,
+												ast.makeConstant(
+														new CAstSymbolImpl(
+																optional_vars.getChild(0).getValue().toString(),
+																PythonCAstToIRTranslator.Any)),
+												context_expr)
+										: ast.makeNode(
+												CAstNode.ASSIGN, optional_vars, context_expr),
+                ast.makeNode(
+                    CAstNode.UNWIND,
+                    ast.makeNode(
+                        CAstNode.BLOCK_EXPR,
+												ast.makeNode(
+														CAstNode.CALL,
+														ast.makeNode(
+																CAstNode.OBJECT_REF, optional_vars, ast.makeConstant("__begin__")),
+														ast.makeNode(CAstNode.EMPTY)),
+												bodyAst),
+										ast.makeNode(
+												CAstNode.CALL,
+												ast.makeNode(CAstNode.OBJECT_REF, optional_vars, ast.makeConstant("__end__")),
+												ast.makeNode(CAstNode.EMPTY))));
+      }
+
+      return bodyAst;
+		}
 		
 		public CAstNode visitSubscript(PyObject subscript, WalkContext context) {
 			CAstNode obj =  visit(subscript.getAttr("value", PyObject.class), context);
