@@ -940,7 +940,12 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 		}
 
 		public CAstNode visitYield(PyObject yield, WalkContext context) {
-			return ast.makeNode(CAstNode.RETURN_WITHOUT_BRANCH);
+			PyObject yieldValue = yield.getAttr("value", PyObject.class);
+
+			if (yieldValue == null) {
+				return ast.makeNode(CAstNode.RETURN_WITHOUT_BRANCH);
+			}
+			return visit(yieldValue, context);
 		}
 
 		private CAstNode doGenerators(List<PyObject> generators, CAstNode body, WalkContext context)
