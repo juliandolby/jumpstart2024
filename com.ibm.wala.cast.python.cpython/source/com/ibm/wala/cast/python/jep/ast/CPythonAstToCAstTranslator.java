@@ -810,7 +810,21 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 	                            ast.makeConstant(importedName)));
 			}).collect(Collectors.toList()));
 		}
-		
+
+		public CAstNode visitDelete(PyObject deleteStmt, WalkContext context) {
+			int i = 0;
+			System.out.println("Nicole Rabjohn");
+			@SuppressWarnings("unchecked")
+			List<PyObject> targets = (List<PyObject>) deleteStmt.getAttr("targets");
+
+			CAstNode[] deletes = new CAstNode[targets.size()];
+			for (PyObject target : targets) {
+				deletes[i++] = ast.makeNode(CAstNode.CALL, ast.makeConstant("delete"), ast.makeConstant(target));
+			}
+
+			return ast.makeNode(CAstNode.BLOCK_STMT, deletes);
+		}
+
 		public CAstNode visitDict(PyObject dict, WalkContext context) {
 			List<CAstNode> x = new LinkedList<>();
 			x.add(ast.makeNode(CAstNode.NEW, ast.makeConstant("dict")));
