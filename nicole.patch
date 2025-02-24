@@ -1,0 +1,57 @@
+diff --git a/com.ibm.wala.cast.python.cpython/source/com/ibm/wala/cast/python/jep/ast/CPythonAstToCAstTranslator.java b/com.ibm.wala.cast.python.cpython/source/com/ibm/wala/cast/python/jep/ast/CPythonAstToCAstTranslator.java
+index 14f3051..65204ad 100644
+--- a/com.ibm.wala.cast.python.cpython/source/com/ibm/wala/cast/python/jep/ast/CPythonAstToCAstTranslator.java
++++ b/com.ibm.wala.cast.python.cpython/source/com/ibm/wala/cast/python/jep/ast/CPythonAstToCAstTranslator.java
+@@ -592,7 +592,36 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
+ 			    .map(f -> visit(f, context))
+ 			    .collect(Collectors.toList()));
+ 		}
+-		
++
++		public CAstNode visitBoolOp(PyObject o, WalkContext context) {
++			PyObject op = (PyObject) o.getAttr("op");
++			String opName = op.getAttr("__class__", PyObject.class).getAttr("__name__", String.class);
++
++			@SuppressWarnings("unchecked")
++			List<PyObject> values = (List<PyObject>) o.getAttr("values");
++			CAstNode result = visit(values.get(0), context);
++
++			for (int i = 1; i < values.size(); i++) {
++				PyObject next = values.get(i);
++				CAstNode nextNode = visit(next, context);
++
++				result = switch (opName) {
++					case "Or" -> ast.makeNode(CAstNode.IF_EXPR, result, nextNode, ast.makeConstant(false));
++					case "And" -> ast.makeNode(
++							CAstNode.IF_EXPR,
++							ast.makeNode(CAstNode.UNARY_EXPR, CAstOperator.OP_NOT, result),
++							ast.makeConstant(true),
++							nextNode);
++					default -> {
++						assert false;
++						yield null;
++					}
++				};
++			}
++
++			return result;
++		}
++
+ 		public CAstNode visitCall(PyObject o, WalkContext context) {
+ 			PyObject func = o.getAttr("func", PyObject.class);
+ 			@SuppressWarnings("unchecked")
+diff --git a/tests/python/python3/bool_op.py b/tests/python/python3/bool_op.py
+new file mode 100644
+index e69de29..4ff2a8b 100644
+--- /dev/null
++++ b/tests/python/python3/bool_op.py
+@@ -0,0 +1,8 @@
++x = True
++y = False
++
++a = x and y
++b = x or y
++
++print(b)
++print(a)
+\ No newline at end of file

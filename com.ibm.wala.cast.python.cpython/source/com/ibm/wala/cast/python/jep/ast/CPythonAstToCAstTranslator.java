@@ -592,7 +592,36 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			    .map(f -> visit(f, context))
 			    .collect(Collectors.toList()));
 		}
-		
+
+		public CAstNode visitBoolOp(PyObject o, WalkContext context) {
+			PyObject op = (PyObject) o.getAttr("op");
+			String opName = op.getAttr("__class__", PyObject.class).getAttr("__name__", String.class);
+
+			@SuppressWarnings("unchecked")
+			List<PyObject> values = (List<PyObject>) o.getAttr("values");
+			CAstNode result = visit(values.get(0), context);
+
+			for (int i = 1; i < values.size(); i++) {
+				PyObject next = values.get(i);
+				CAstNode nextNode = visit(next, context);
+
+				result = switch (opName) {
+					case "Or" -> ast.makeNode(CAstNode.IF_EXPR, result, nextNode, ast.makeConstant(false));
+					case "And" -> ast.makeNode(
+							CAstNode.IF_EXPR,
+							ast.makeNode(CAstNode.UNARY_EXPR, CAstOperator.OP_NOT, result),
+							ast.makeConstant(true),
+							nextNode);
+					default -> {
+						assert false;
+						yield null;
+					}
+				};
+			}
+
+			return result;
+		}
+
 		public CAstNode visitCall(PyObject o, WalkContext context) {
 			PyObject func = o.getAttr("func", PyObject.class);
 			@SuppressWarnings("unchecked")
