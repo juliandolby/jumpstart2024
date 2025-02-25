@@ -1,0 +1,38 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Current File",
+      "request": "launch",
+      "mainClass": "${file}"
+    },
+    {
+      "type": "java",
+      "name": "CPythonAstToCAstTranslator",
+      "request": "launch",
+      "mainClass": "com.ibm.wala.cast.python.jep.ast.CPythonAstToCAstTranslator",
+      "javaExec": "/root/miniconda3/envs/wala/bin/java",
+      "projectName": "com.ibm.wala.cast.python.cpython",
+      "classPaths": [
+        "/root/code/jumpstart/jumpstart2024/com.ibm.wala.cast.python.cpython/target/com.ibm.wala.cast.python.cpython-0.0.1-SNAPSHOT.jar",
+      ],
+      "vmArgs": [
+        "-Djava.library.path=/root/miniconda3/envs/wala/lib/python3.13/site-packages/jep/"
+      ],
+      "args": [
+        "/root/code/jumpstart/jumpstart2024/com.ibm.wala.cast.python.cpython/data/test_global_reference.py",
+      ]
+    },
+    {
+      "type": "java",
+      "name": "ParquetPythonReader",
+      "request": "launch",
+      "mainClass": "com.ibm.wala.cast.python.parquet.ParquetPythonReader",
+      "projectName": "com.ibm.wala.cast.python.cpython"
+    }
+  ]
+}
