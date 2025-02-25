@@ -592,7 +592,36 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			    .map(f -> visit(f, context))
 			    .collect(Collectors.toList()));
 		}
-		
+
+		public CAstNode visitBoolOp(PyObject o, WalkContext context) {
+			PyObject op = (PyObject) o.getAttr("op");
+			String opName = op.getAttr("__class__", PyObject.class).getAttr("__name__", String.class);
+
+			@SuppressWarnings("unchecked")
+			List<PyObject> values = (List<PyObject>) o.getAttr("values");
+			CAstNode result = visit(values.get(0), context);
+
+			for (int i = 1; i < values.size(); i++) {
+				PyObject next = values.get(i);
+				CAstNode nextNode = visit(next, context);
+
+				result = switch (opName) {
+					case "Or" -> ast.makeNode(CAstNode.IF_EXPR, result, nextNode, ast.makeConstant(false));
+					case "And" -> ast.makeNode(
+							CAstNode.IF_EXPR,
+							ast.makeNode(CAstNode.UNARY_EXPR, CAstOperator.OP_NOT, result),
+							ast.makeConstant(true),
+							nextNode);
+					default -> {
+						assert false;
+						yield null;
+					}
+				};
+			}
+
+			return result;
+		}
+
 		public CAstNode visitCall(PyObject o, WalkContext context) {
 			PyObject func = o.getAttr("func", PyObject.class);
 			@SuppressWarnings("unchecked")
@@ -810,7 +839,21 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 	                            ast.makeConstant(importedName)));
 			}).collect(Collectors.toList()));
 		}
-		
+
+		public CAstNode visitDelete(PyObject deleteStmt, WalkContext context) {
+			int i = 0;
+			System.out.println("Nicole Rabjohn");
+			@SuppressWarnings("unchecked")
+			List<PyObject> targets = (List<PyObject>) deleteStmt.getAttr("targets");
+
+			CAstNode[] deletes = new CAstNode[targets.size()];
+			for (PyObject target : targets) {
+				deletes[i++] = ast.makeNode(CAstNode.CALL, ast.makeConstant("delete"), ast.makeConstant(target));
+			}
+
+			return ast.makeNode(CAstNode.BLOCK_STMT, deletes);
+		}
+
 		public CAstNode visitDict(PyObject dict, WalkContext context) {
 			List<CAstNode> x = new LinkedList<>();
 			x.add(ast.makeNode(CAstNode.NEW, ast.makeConstant("dict")));
@@ -870,6 +913,10 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 			CAstNode target = visit(fl.getAttr("target", PyObject.class), context);
 		}
 		*/
+
+		public CAstNode visitSet(PyObject set, WalkContext context) {
+			return handleList("set", "elts", set, context);
+		}
 		
 		public CAstNode visitSubscript(PyObject subscript, WalkContext context) {
 			CAstNode obj =  visit(subscript.getAttr("value", PyObject.class), context);
@@ -933,6 +980,15 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 							ast.makeNode(CAstNode.NEW, ast.makeConstant(PythonTypes.dict))),
 					doGenerators((List<PyObject>) arg0.getAttr("generators"), body, context),
 					ast.makeNode(CAstNode.VAR, ast.makeConstant(dictName)));
+		}
+
+		public CAstNode visitYield(PyObject yield, WalkContext context) {
+			PyObject yieldValue = yield.getAttr("value", PyObject.class);
+
+			if (yieldValue == null) {
+				return ast.makeNode(CAstNode.RETURN_WITHOUT_BRANCH);
+			}
+			return visit(yieldValue, context);
 		}
 
 		private CAstNode doGenerators(List<PyObject> generators, CAstNode body, WalkContext context)
