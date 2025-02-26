@@ -842,7 +842,6 @@ public class CPythonAstToCAstTranslator implements TranslatorToCAst {
 
 		public CAstNode visitDelete(PyObject deleteStmt, WalkContext context) {
 			int i = 0;
-			System.out.println("Nicole Rabjohn");
 			@SuppressWarnings("unchecked")
 			List<PyObject> targets = (List<PyObject>) deleteStmt.getAttr("targets");
 
