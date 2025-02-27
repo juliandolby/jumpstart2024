@@ -2,7 +2,6 @@ package com.ibm.wala.cast.python.jep.ast;
 
 import static com.ibm.wala.cast.python.jep.Util.interps;
 import static com.ibm.wala.cast.python.jep.Util.runit;
-import static com.ibm.wala.shrike.shrikeBT.Util.makeType;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +30,6 @@ import com.ibm.wala.cast.ir.translator.TranslatorToCAst;
 import com.ibm.wala.cast.python.ir.PythonCAstToIRTranslator;
 import com.ibm.wala.cast.python.ir.PythonLanguage;
 import com.ibm.wala.cast.python.loader.PythonLoaderFactory;
-import com.ibm.wala.cast.python.parser.AbstractParser;
 import com.ibm.wala.cast.python.types.PythonTypes;
 import com.ibm.wala.cast.tree.CAst;
 import com.ibm.wala.cast.tree.CAstEntity;
@@ -68,7 +66,7 @@ import jep.python.PyObject;
  * An api for creating a WALA CASst representation of the standard Python
  * ASTs given source code.
  */
-public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements TranslatorToCAst {
+public class CPythonAstToCAstTranslator<T> implements TranslatorToCAst {
 
 	private static CAstType codeBody = new CAstType() {
 		@Override
@@ -82,22 +80,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		}
 	};
 
-	private CPythonAstToCAstTranslator(String fn, Path pn) throws IOException {
-		CPythonAstToCAstTranslator.entity = new PythonScriptEntity(fn, pn);
-	}
-
-	public CPythonAstToCAstTranslator(String fn, String code) throws IOException {
-		CPythonAstToCAstTranslator.entity = new PythonScriptEntity(fn, code);
-	}
-
-	public CPythonAstToCAstTranslator(CAstType type, String fn, String scriptCode) throws IOException {
-        CPythonAstToCAstTranslator.entity = new PythonScriptEntity(type, fn, scriptCode);
-	}
-
-	public CAstEntity getEntity() {
-		return entity;
-	}
-	
 	/**
 	 * parse Python code into the standard CPython AST
 	 * @param code source code to be parsed into an AST
@@ -141,7 +123,7 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 
 	private static final CAstPattern nm = CAstPattern.parse("ASSIGN(VAR(<n>*),**)");
 
-	public final class PythonScriptEntity extends AbstractCodeEntity {
+	public static final class PythonScriptEntity extends AbstractCodeEntity {
 		private final String fn;
 
 		private static CAstType makeType(String fn) {
@@ -195,11 +177,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			PyObject ast = CPythonAstToCAstTranslator.getAST(scriptCode);
 			CAstTypeDictionaryImpl<String> typeDict = new CAstTypeDictionaryImpl<>();
 			TestVisitor x = new TestVisitor(this) {
-				@Override
-				protected CAstNode notePosition(CAstNode cAstNode, Position position) {
-					return null;
-				}
-
 				@Override
 				public URL url() {
 					try {
@@ -264,7 +241,7 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		Scope scope();
 	}
 
-	public class ScriptContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
+	public static class ScriptContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
 			implements WalkContext {
 		private final Scope scope; 
 		
@@ -277,22 +254,12 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			this.self = self;
 			scope = new Scope() {
 				@Override
-				public WalkContext getParent() {
-					return null;
-				}
-
-				@Override
 				Scope parent() {
 					return null;
 				}
-
-				@Override
-				WalkContext context() {
-					return this;
-				}
 			};
 		}
-		
+
 		public Scope scope() {
 			return scope;
 		}
@@ -327,7 +294,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 
 		@Override
 		public CAstSourcePositionRecorder pos() {
-			System.out.println(self.getSourceMap());
 			return (CAstSourcePositionRecorder) self.getSourceMap();
 		}
 
@@ -342,77 +308,37 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		}
 	}
 
-	private static abstract class Scope implements WalkContext {
+	private static abstract class Scope {
 		abstract Scope parent();
-		abstract WalkContext context();
-		
+
 		Set<String> nonLocalNames = HashSetFactory.make();
 		Set<String> globalNames = HashSetFactory.make();
-		Set<String> allNames = HashSetFactory.make();
-		Set<String> writtenNames = HashSetFactory.make();
-
-		@Override
-		public Scope scope() {
-			if (this.context() != null) {
-				return this;
-			} else if (this.parent() != null) {
-				return this.parent();
-			} else {
-				return null;
-			}
-		}
-
-		@Override
-		public CAstSourcePositionRecorder pos() {
-			if (this.context() != null) {
-				return this.context().pos();
-			} else if (this.parent() != null) {
-				return this.parent().pos();
-			} else {
-				return null;
-			}
-		}
 	}
 	
 	private static class FunctionContext extends TranslatorToCAst.FunctionContext<WalkContext, PyObject>
 		implements WalkContext {
 		private final Scope scope;
-		private final AbstractCodeEntity fun;
+		private final PyObject ast;
+		private final CAstSourcePositionRecorder pos = new CAstSourcePositionRecorder();
 
 		public Scope scope() {
 			return scope;
 		}
 
-		protected FunctionContext(WalkContext parent, PyObject s, AbstractCodeEntity fun) {
+		protected FunctionContext(WalkContext parent, PyObject s) {
 			super(parent, s);
-			this.fun = fun;
 			scope = new Scope() {
-
-				@Override
-				public WalkContext getParent() {
-					return parent;
-				}
-
 				@Override
 				Scope parent() {
 					return parent.scope();
 				}
-
-				@Override
-				WalkContext context() {
-					return this;
-				}
 			};
-		}
-
-		@Override
-		public CAstNodeTypeMapRecorder getNodeTypeMap() {
-			return fun.getNodeTypeMap();
+			this.ast = s;
 		}
 
 		@Override
 		public CAstSourcePositionRecorder pos() {
-			return null;
+			return this.pos;
 		}
 	}
 
@@ -425,7 +351,8 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 
 		private boolean continued = false;
 		private boolean broke = false;
-				
+		private final CAstSourcePositionRecorder pos = new CAstSourcePositionRecorder();
+
 		@Override
 		public Scope scope() {
 			return parent.scope();
@@ -452,7 +379,7 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 
 		@Override
 		public CAstSourcePositionRecorder pos() {
-			return this.parent.pos();
+			return this.pos;
 		}
 	}
 
@@ -460,32 +387,17 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			implements WalkContext {
 		private final Scope scope;
 		private CAstNodeTypeMapRecorder types;
+		private final CAstSourcePositionRecorder pos = new CAstSourcePositionRecorder();
 
 		TryCatchContext(WalkContext parent, Map<String, CAstNode> catchNode) {
 			super(parent, catchNode);
 			scope = new Scope() {
-
-				@Override
-				public WalkContext getParent() {
-					return parent;
-				}
-
 				@Override
 				Scope parent() {
 					return parent.scope();
 				}
-
-				@Override
-				WalkContext context() {
-					return this;
-				}
-
 			};
 			this.types = new CAstNodeTypeMapRecorder();
-		}
-
-		public WalkContext getParent() {
-			return scope;
 		}
 
 		@Override
@@ -500,13 +412,13 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 
 		@Override
 		public CAstSourcePositionRecorder pos() {
-			return this.scope.pos();
+			return this.pos;
 		}
 	}
 
 	private static CAstEntity entity;
 
-	public class TestVisitor extends AbstractParser<T>.CAstVisitor implements JepAstVisitor<CAstNode, WalkContext> {
+	public static abstract class TestVisitor implements JepAstVisitor<CAstNode, WalkContext> {
 		CAst ast = new CAstImpl();
 		private int label = 0;
 		private final CAstEntity entity;
@@ -527,7 +439,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			CAstNode n = JepAstVisitor.super.visit(o, context);
 			if (pos != null) {
 				System.out.println(context);
-				// context.pos() is null so we can't set the position
 				context.pos().setPosition(n, pos);
 			}
 			return n;
@@ -568,7 +479,7 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		
 		@SuppressWarnings("unchecked")
 		public CAstNode visitFunctionDef(PyObject o, WalkContext context) {
-			WalkContext fc = new FunctionContext(context, o, (AbstractCodeEntity) this.entity);
+			WalkContext fc = new FunctionContext(context, o);
 			
 			String functionName = (String) o.getAttr("name");
 			
@@ -704,8 +615,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		public CAstNode visitName(PyObject o, WalkContext context) {
 			String nm = (String) o.getAttr("id");
 
-			context.scope().allNames.add(nm);
-			 
 			return ast.makeNode(CAstNode.VAR, ast.makeConstant(nm));
 		}
 
@@ -719,13 +628,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			CAstNode rhs = visit(value, context);
 			@SuppressWarnings("unchecked")
 			List<PyObject> body = (List<PyObject>) o.getAttr("targets");
-			body.forEach(e -> {
-				CAstNode node = visit(e, context);
-				if (node.getKind() == CAstNode.VAR) {
-					String varName = (String) node.getChild(0).getValue();
-					context.scope().writtenNames.add(varName);
-				}
-			});
 			return ast.makeNode(CAstNode.BLOCK_STMT, body.stream()
 					.map(f -> ast.makeNode(CAstNode.ASSIGN, visit(f, context), rhs))
 					.collect(Collectors.toList()));
@@ -1279,36 +1181,45 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			System.out.println(block);
 			@SuppressWarnings("unchecked")
 			List<PyObject> handlersAttr = (List<PyObject>) arg0.getAttr("handlers");
-			handlersAttr.forEach(p -> {
-				String name = "x";
-				if (p.getAttr("name", String.class) != null) {
-					name = p.getAttr("name", String.class);
-				}
-				CAstNode nameNode = ast.makeConstant(name);
-				CAstNode typeNode;
-				if (p.getAttr("type", PyObject.class) != null) {
-					typeNode = visit(p.getAttr("type", PyObject.class), context);
-				} else {
-					typeNode = ast.makeConstant("any");
-				}
-				List<PyObject> handlerBody = (List<PyObject>) p.getAttr("body");
-				CAstNode handlerBlock = ast.makeNode(CAstNode.BLOCK_STMT, handlerBody.stream().map(f -> visit(f, context)).collect(Collectors.toList()));
-				handlers.put(
-						typeNode.toString(),
-						ast.makeNode(
-								CAstNode.CATCH,
-								nameNode,
+			if (handlersAttr != null) {
+				handlersAttr.forEach(p -> {
+					String name = "x";
+					if (p.getAttr("name", String.class) != null) {
+						name = p.getAttr("name", String.class);
+					}
+					CAstNode nameNode = ast.makeConstant(name);
+					CAstNode typeNode;
+					if (p.getAttr("type", PyObject.class) != null) {
+						typeNode = visit(p.getAttr("type", PyObject.class), context);
+					} else {
+						typeNode = ast.makeConstant("any");
+					}
+					List<PyObject> handlerBody = (List<PyObject>) p.getAttr("body");
+					if (!handlerBody.isEmpty()) {
+						CAstNode handlerBlock = ast.makeNode(CAstNode.BLOCK_STMT, (CAstNode) handlerBody.stream().map(f -> {
+							if (f != null) {
+								visit(f, context);
+							}
+							return CAstNode.EMPTY;
+						}).collect(Collectors.toList()));
+						handlers.put(
+								typeNode.toString(),
 								ast.makeNode(
-										CAstNode.BLOCK_STMT,
+										CAstNode.CATCH,
+										nameNode,
 										ast.makeNode(
-												CAstNode.ASSIGN,
-												ast.makeNode(CAstNode.VAR, ast.makeConstant("$currentException")),
-												ast.makeNode(CAstNode.VAR, ast.makeConstant(nameNode.getValue()))),
-										handlerBlock)));
+												CAstNode.BLOCK_STMT,
+												ast.makeNode(
+														CAstNode.ASSIGN,
+														ast.makeNode(CAstNode.VAR, ast.makeConstant("$currentException")),
+														ast.makeNode(CAstNode.VAR, ast.makeConstant(nameNode.getValue()))),
+												handlerBlock)));
 //				if (p.getAttr("type", PyObject.class) != null) {
 //					context.getNodeTypeMap().add(nameNode, types.getCAstTypeFor(p.getAttr("type", PyObject.class)));
 //				}
-			});
+					}
+				});
+			}
 			TryCatchContext catches = new TryCatchContext(context, handlers);
 
 			CAstNode catchCtx = visit(arg0, catches);
@@ -1736,11 +1647,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 	              }
 	            },
 	            tree).stream().map(s -> (String)((CAstNode)s.get("n")).getValue()).collect(Collectors.toSet());
-		}
-
-		@Override
-		protected CAstNode notePosition(CAstNode cAstNode, Position position) {
-			return null;
 		}
 	}
 	

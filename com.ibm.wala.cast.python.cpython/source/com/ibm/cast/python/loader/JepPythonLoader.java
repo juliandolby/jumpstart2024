@@ -55,7 +55,7 @@ public class JepPythonLoader extends PythonLoader {
 			@Override
 			public CAstEntity translateToCAst() throws Error, IOException {
 				try (BufferedReader src = new BufferedReader(((SourceModule)M).getInputReader())) {
-					return new CPythonAstToCAstTranslator(M.getName(), src.lines().collect(Collectors.joining("\n"))).getEntity();
+					return new CPythonAstToCAstTranslator.PythonScriptEntity(M.getName(), src.lines().collect(Collectors.joining("\n")));
 				}
 			}
 		};
