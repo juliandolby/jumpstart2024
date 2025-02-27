@@ -1169,54 +1169,52 @@ public class CPythonAstToCAstTranslator<T> implements TranslatorToCAst {
 
 //		@SuppressWarnings("unchecked")
 		public CAstNode visitTry(PyObject arg0, WalkContext context) {
-			System.out.println("Hello here");
 			Map<String, CAstNode> handlers = HashMapFactory.make();
 
 			@SuppressWarnings("unchecked")
 			List<PyObject> body = (List<PyObject>) arg0.getAttr("body");
-			System.out.println(context.pos());
 			CAstNode block = ast.makeNode(CAstNode.BLOCK_STMT, body.stream().map(f -> visit(f, context)).collect(Collectors.toList()));
 
-			System.out.println(body);
-			System.out.println(block);
 			@SuppressWarnings("unchecked")
 			List<PyObject> handlersAttr = (List<PyObject>) arg0.getAttr("handlers");
 			if (handlersAttr != null) {
 				handlersAttr.forEach(p -> {
-					String name = "x";
-					if (p.getAttr("name", String.class) != null) {
-						name = p.getAttr("name", String.class);
-					}
-					CAstNode nameNode = ast.makeConstant(name);
-					CAstNode typeNode;
-					if (p.getAttr("type", PyObject.class) != null) {
-						typeNode = visit(p.getAttr("type", PyObject.class), context);
-					} else {
-						typeNode = ast.makeConstant("any");
-					}
-					List<PyObject> handlerBody = (List<PyObject>) p.getAttr("body");
-					if (!handlerBody.isEmpty()) {
-						CAstNode handlerBlock = ast.makeNode(CAstNode.BLOCK_STMT, (CAstNode) handlerBody.stream().map(f -> {
-							if (f != null) {
-								visit(f, context);
-							}
-							return CAstNode.EMPTY;
-						}).collect(Collectors.toList()));
-						handlers.put(
-								typeNode.toString(),
-								ast.makeNode(
-										CAstNode.CATCH,
-										nameNode,
-										ast.makeNode(
-												CAstNode.BLOCK_STMT,
-												ast.makeNode(
-														CAstNode.ASSIGN,
-														ast.makeNode(CAstNode.VAR, ast.makeConstant("$currentException")),
-														ast.makeNode(CAstNode.VAR, ast.makeConstant(nameNode.getValue()))),
-												handlerBlock)));
+					if (p != null) {
+						String name = "x";
+						if (p.getAttr("name", String.class) != null) {
+							name = p.getAttr("name", String.class);
+						}
+						CAstNode nameNode = ast.makeConstant(name);
+						CAstNode typeNode;
+						if (p.getAttr("type", PyObject.class) != null) {
+							typeNode = visit(p.getAttr("type", PyObject.class), context);
+						} else {
+							typeNode = ast.makeConstant("any");
+						}
+						List<PyObject> handlerBody = (List<PyObject>) p.getAttr("body");
+						if (!handlerBody.isEmpty()) {
+							CAstNode handlerBlock = ast.makeNode(CAstNode.BLOCK_STMT, (CAstNode) handlerBody.stream().map(f -> {
+								if (f != null) {
+									visit(f, context);
+								}
+								return CAstNode.EMPTY;
+							}).collect(Collectors.toList()));
+							handlers.put(
+									typeNode.toString(),
+									ast.makeNode(
+											CAstNode.CATCH,
+											nameNode,
+											ast.makeNode(
+													CAstNode.BLOCK_STMT,
+													ast.makeNode(
+															CAstNode.ASSIGN,
+															ast.makeNode(CAstNode.VAR, ast.makeConstant("$currentException")),
+															ast.makeNode(CAstNode.VAR, ast.makeConstant(nameNode.getValue()))),
+													handlerBlock)));
 //				if (p.getAttr("type", PyObject.class) != null) {
 //					context.getNodeTypeMap().add(nameNode, types.getCAstTypeFor(p.getAttr("type", PyObject.class)));
 //				}
+						}
 					}
 				});
 			}
