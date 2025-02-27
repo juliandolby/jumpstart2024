@@ -194,7 +194,7 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			this.fn = fn;
 			PyObject ast = CPythonAstToCAstTranslator.getAST(scriptCode);
 			CAstTypeDictionaryImpl<String> typeDict = new CAstTypeDictionaryImpl<>();
-			TestVisitor x = new TestVisitor(this, typeDict) {
+			TestVisitor x = new TestVisitor(this) {
 				@Override
 				protected CAstNode notePosition(CAstNode cAstNode, Position position) {
 					return null;
@@ -514,7 +514,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 		
 		private TestVisitor(CAstEntity self) {
 			entity = self;
-            this.types = types;
         }
 
 		@Override
@@ -1306,9 +1305,9 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 												ast.makeNode(CAstNode.VAR, ast.makeConstant("$currentException")),
 												ast.makeNode(CAstNode.VAR, ast.makeConstant(nameNode.getValue()))),
 										handlerBlock)));
-				if (p.getAttr("type", PyObject.class) != null) {
-					context.getNodeTypeMap().add(nameNode, types.getCAstTypeFor(p.getAttr("type", PyObject.class)));
-				}
+//				if (p.getAttr("type", PyObject.class) != null) {
+//					context.getNodeTypeMap().add(nameNode, types.getCAstTypeFor(p.getAttr("type", PyObject.class)));
+//				}
 			});
 			TryCatchContext catches = new TryCatchContext(context, handlers);
 
@@ -1338,7 +1337,6 @@ public class CPythonAstToCAstTranslator<T> extends AbstractParser<T> implements 
 			return ast.makeNode(CAstNode.EMPTY);
 		}
 
-		private int tmpIndex = 0;
 		public CAstNode visitDictComp(PyObject arg0, WalkContext context) throws Exception {
 			String dictName = "temp " + tmpIndex++;
 			CAstNode body =
