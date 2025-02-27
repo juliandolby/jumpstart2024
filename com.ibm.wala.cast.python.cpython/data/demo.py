@@ -1,19 +1,13 @@
-LOGS = [
-    "192.168.1.1 - 200 - OK",
-    "10.0.0.1 - 403 - Forbidden",
-    "192.168.1.2 - 500 - Server Error",
-    "192.168.1.1 - 403 - Forbidden",
-]
+def read_logs(file_path):
+    with open(file_path, 'r') as f:
+        for log in f:
+            yield log
 
-def read_logs(logs):
-    for log in logs:
-        yield log
-
-def analyze_logs(logs):
+def analyze_logs(file_path):
     threat_ips = set()
     log_counts = {}
 
-    for log in read_logs(logs):
+    for log in read_logs(file_path):
         ip, status, _ = log.split(" - ")
         status = int(status)
 
@@ -28,6 +22,6 @@ def analyze_logs(logs):
     unused_var = "This variable is never used"
     return threat_ips
 
-print("Threat IPs: " + str(analyze_logs(LOGS)))
+print("Threat IPs: " + str(analyze_logs('logs.txt')))
 
 del LOGS
