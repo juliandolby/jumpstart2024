@@ -9,6 +9,7 @@ import java.net.URL;
 
 import com.ibm.wala.cast.python.jep.Util;
 import com.ibm.wala.cast.python.jep.ast.CPythonAstToCAstTranslator.WalkContext;
+import com.ibm.wala.cast.tree.CAstNode;
 import com.ibm.wala.cast.tree.CAstSourcePositionMap.Position;
 import com.ibm.wala.cast.tree.impl.AbstractSourcePosition;
 
@@ -109,5 +110,4 @@ public interface JepAstVisitor<R, S> {
 	default R visitModule(PyObject o, S context) {
 		return null;
 	}
-	
 }

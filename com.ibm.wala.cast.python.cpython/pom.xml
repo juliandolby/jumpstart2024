@@ -1,27 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="https://maven.apache.org/POM/4.0.0" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>com.ibm.wala</groupId>
-    <artifactId>ml</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-  </parent>
-  <artifactId>com.ibm.wala.cast.python.cpython</artifactId>
-  <dependencies>
-    <dependency>
-      <groupId>com.ibm.wala</groupId>
-      <artifactId>com.ibm.wala.util</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.ibm.wala</groupId>
-      <artifactId>com.ibm.wala.shrike</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.ibm.wala</groupId>
-      <artifactId>com.ibm.wala.core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.ibm.wala</groupId>
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ibm.wala</groupId>
+        <artifactId>ml</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+    </parent>
+    <artifactId>com.ibm.wala.cast.python.cpython</artifactId>
+    <dependencies>
+        <dependency>
+            <groupId>com.ibm.wala</groupId>
+            <artifactId>com.ibm.wala.util</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ibm.wala</groupId>
+            <artifactId>com.ibm.wala.shrike</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ibm.wala</groupId>
+            <artifactId>com.ibm.wala.core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ibm.wala</groupId>
       <artifactId>com.ibm.wala.cast</artifactId>
     </dependency>
     <dependency>
@@ -47,15 +47,15 @@
   	 <artifactId>parquet-avro</artifactId>
      <version>1.14.3</version>
     </dependency>
-<dependency>
-    <groupId>org.apache.hadoop</groupId>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-common</artifactId>
-    <version>3.4.1</version>
+    <version>3.4.0</version>
 </dependency>
 <dependency>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-mapreduce-client-core</artifactId>
-    <version>3.4.1</version>
+    <version>3.4.0</version>
 </dependency>
   </dependencies>
   <build>
@@ -64,6 +64,39 @@
         <directory>data</directory>
       </resource>
     </resources>
+
     <sourceDirectory>source</sourceDirectory>
+	<plugins>
+		<plugin>
+			<groupId>org.apache.maven.plugins</groupId>
+			<artifactId>maven-shade-plugin</artifactId>
+			<version>3.6.0</version>
+			<configuration>
+			  <filters>
+			    <filter>
+			      <artifact>*:*</artifact>
+			      <excludes>
+				<exclude>META-INF/*.SF</exclude>
+				<exclude>META-INF/*.DSA</exclude>
+				<exclude>META-INF/*.RSA</exclude>
+			      </excludes>
+			    </filter>
+			  </filters>
+				<transformers>
+					<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+						<mainClass>com.ibm.wala.cast.python.jep.ast.CPythonAstToCAstTranslator</mainClass>
+					</transformer>
+				</transformers>
+			</configuration>
+			<executions>
+				<execution>
+					<phase>package</phase>
+					<goals>
+						<goal>shade</goal>
+					</goals>
+				</execution>
+			</executions>
+		</plugin>
+	</plugins>
   </build>
-</project>
+  </project>
