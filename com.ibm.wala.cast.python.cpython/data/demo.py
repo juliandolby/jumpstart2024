@@ -11,8 +11,9 @@ def analyze_logs(file_path):
         ip, status, _ = log.split(" - ")
         status = int(status)
 
-        if status == 403:
-            threat_ips.add(ip)
+        match status:
+            case 403:
+                threat_ips.add(ip)
 
         log_counts[ip] = log_counts.get(ip, 0) + 1
 
